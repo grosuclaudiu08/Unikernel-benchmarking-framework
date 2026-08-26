@@ -1,0 +1,25 @@
+spec: v0.6
+name: nginx-native
+
+unikraft:
+  version: stable
+
+libraries:
+  musl: stable
+  lwip: stable
+  zlib: stable
+  nginx: stable
+
+targets:
+  - architecture: x86_64
+    platform: qemu
+
+rootfs: ./rootfs
+
+cmd: ["-c", "/nginx/conf/nginx.conf"]
+
+kconfig:
+  CONFIG_LIBVFSCORE: y
+  CONFIG_LIBVFSCORE_AUTOMOUNT_CI: y
+  CONFIG_LIBVFSCORE_AUTOMOUNT_CI_INITRD: y
+  CONFIG_LIBPOSIX_FDTAB_MAXFDS: 8192
