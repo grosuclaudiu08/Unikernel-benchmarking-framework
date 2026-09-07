@@ -1,3 +1,20 @@
+# Unikraft specific
 .unikraft/
+.config
 .config.*
+.config.old
+Kraftfile.json
+
+# Build artifacts and logs
 *.log
+*.tar
+*.tar.gz
+*.cpio
+kernel.asm
+
+# QEMU / VSCode / Temp
+.vscode/
+tmp/
+*.tmp
+*.bak
+*~
