@@ -8,7 +8,7 @@ Mai jos este prezentată o analiză detaliată a ceea ce s-a implementat pe fiec
 
 ### 1. Partea Persoanei 1 (Unikraft & Orchestrator Core)
 *   **Stadiu Nginx Nativ:** ✅ **Implementat**. S-a creat cu succes mediul pentru Nginx Nativ pe Unikraft (în folderul `unikraft/nginx-native/`).
-*   **Stadiu Nginx Bincompat (app-elfloader):** ❌ **OMISIUNE**. Conform planului, trebuia implementată și varianta de Nginx rulată prin compatibilitate binară (cu binar de Linux extras și Kraftfile pentru elfloader). Această parte **lipsește**.
+*   **Stadiu Nginx Bincompat (app-elfloader):** ✅ **Finalizat**. S-a implementat varianta de Nginx rulată prin compatibilitate binară folosind Unikraft `app-elfloader`. Tot sistemul de fișiere de Linux și librăriile necesare se află în `unikraft/nginx-bincompat/`.
 *   **Stadiu Orchestrator Core:** ❌ **OMISIUNE**. Scriptul principal de orchestrare (`orchestrator.py` sau `.bash`) care preia parametrii din CLI și pornește procesele hipervizoarelor nu a fost creat.
 
 ### 2. Partea Persoanei 2 (NanoVMs & Teardown/Isolation)
@@ -20,8 +20,7 @@ Mai jos este prezentată o analiză detaliată a ceea ce s-a implementat pe fiec
 ## Ce mai trebuie adăugat / Implementat (Pașii Următori)
 
 ### Imediat (Corecturi Faza 1 & 2):
-1. **Persoana 1** trebuie să creeze folderul `unikraft/nginx-bincompat/` și să implementeze Baseline-ul 2 cu `app-elfloader`.
-2. **Persoana 1** trebuie să dezvolte **Orchestrator Core** (scriptul de lansare centralizat care integrează funcțiile din `teardown.py`).
+1. **Persoana 1** trebuie să dezvolte **Orchestrator Core** (scriptul de lansare centralizat care integrează funcțiile din `teardown.py`).
 
 ### Pașii de Benchmarking & Analiză (Faza 3 & 4 - Nealocați):
 1. **Metrici Boot Time:** Extragerea timpului de boot direct din log-urile QEMU.
