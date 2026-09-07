@@ -1,26 +1,30 @@
-# Unikernel Benchmarking Framework - Raport Persoana 2
+# Unikernel Benchmarking Framework
 
-Acest document reflectă exclusiv stadiul sarcinilor și funcționalităților alocate către **Persoana 2**.
+Acest proiect își propune să creeze un cadru de benchmarking automatizat pentru compararea unikernel-urilor, utilizând ca referințe Unikraft și NanoVMs. Aplicația țintă pentru evaluare este un server web Nginx.
 
-## 1. Baseline NanoVMs (Nginx) - `feature/nanovms-baseline`
-**Stadiu:** ✅ **Implementat**
+## Stadiul Proiectului (Status Curent)
 
-- **Utilitar instalat:** `ops` a fost instalat local.
-- **Pachet NanoVMs:** S-a descărcat și validat pachetul oficial `eyberg/nginx:1.18.0`.
-- **Configurări (`config.json` și `nginx.conf`):** 
-  - Fișierul `nanovms/nginx/etc/nginx/nginx.conf` a fost ajustat (setat să asculte pe portul `8080` pentru a eluda necesitatea permisiunilor de root pe host la pornirea prin QEMU).
-  - Testul a fost validat la nivel de HTTP cu `curl` returnând confirmarea succesului din interiorul unikernel-ului.
+Mai jos este prezentată o analiză detaliată a ceea ce s-a implementat pe fiecare componentă/branch, precum și erorile sau omisiunile care trebuie corectate.
 
-## 2. Modulul de Izolare și Teardown - `feature/teardown-and-isolation`
-**Stadiu:** ✅ **Implementat**
+### 1. Partea Persoanei 1 (Unikraft & Orchestrator Core)
+*   **Stadiu Nginx Nativ:** ✅ **Implementat**. S-a creat cu succes mediul pentru Nginx Nativ pe Unikraft (în folderul `unikraft/nginx-native/`).
+*   **Stadiu Nginx Bincompat (app-elfloader):** ❌ **OMISIUNE**. Conform planului, trebuia implementată și varianta de Nginx rulată prin compatibilitate binară (cu binar de Linux extras și Kraftfile pentru elfloader). Această parte **lipsește**.
+*   **Stadiu Orchestrator Core:** ❌ **OMISIUNE**. Scriptul principal de orchestrare (`orchestrator.py` sau `.bash`) care preia parametrii din CLI și pornește procesele hipervizoarelor nu a fost creat.
 
-- **Izolarea Resurselor:** S-a scris scriptul Python (`teardown.py`) care conține funcția `get_isolation_flags(engine)`. Aceasta asamblează și trimite corect argumentele necesare hipervizorului pentru o izolare strictă a resurselor per instanță (**1 vCPU** și **512MB RAM**) atât pentru Unikraft (`kraft run`) cât și pentru NanoVMs (`ops pkg load`).
-- **Funcția de Teardown:** A fost implementat mecanismul `teardown_qemu()`, înregistrat la oprirea execuției prin `atexit`. Acest modul folosește librăria `psutil` pentru a identifica automat un hipervizor (QEMU) abia lansat și forțează distrugerea sa prin `SIGKILL`, eliminând riscul interferenței instanțelor de benchmark blocate.
+### 2. Partea Persoanei 2 (NanoVMs & Teardown/Isolation)
+*   **Stadiu Baseline NanoVMs:** ✅ **Finalizat**. Configurația pentru NanoVMs (fișierele `config.json` și `etc/nginx/nginx.conf` cu redirectare pe portul 8080) a fost implementată cu succes, testată și refactorizată în folderul dedicat `nanovms/nginx/`.
+*   **Stadiu Teardown & Izolare:** ✅ **Finalizat**. Scriptul `teardown.py` limitează corect hardware-ul (1 vCPU, 512MB RAM) și distruge curat instanțele QEMU "orfane" folosind `SIGKILL` prin `psutil`.
 
-## 3. Ce mai trebuie implementat (Pașii Următori / Neasignați încă)
-**Stadiu:** ⏳ **Urmează**
+---
 
-Pe baza etapelor globale 3 și 4 din `Plan.md`, care încă nu au fost împărțite nominal:
-- **Metrici și Boot Time:** Monitorizarea și agregarea timpului de boot direct din jurnale, extragerea mărimii imaginii create, precum și profilarea hipervizorului pentru măsurarea memoriei alocate în regim real.
-- **Integrarea utilitarului `wrk`:** Automatizarea load testing-ului la boot pentru a testa instanțele, monitorizând Requests Per Second și Latența.
-- **Analiza Datelor:** Exportarea metricilor colectate și scrierea scripturilor pentru a exporta diagrame (CSV la Grafice).
+## Ce mai trebuie adăugat / Implementat (Pașii Următori)
+
+### Imediat (Corecturi Faza 1 & 2):
+1. **Persoana 1** trebuie să creeze folderul `unikraft/nginx-bincompat/` și să implementeze Baseline-ul 2 cu `app-elfloader`.
+2. **Persoana 1** trebuie să dezvolte **Orchestrator Core** (scriptul de lansare centralizat care integrează funcțiile din `teardown.py`).
+
+### Pașii de Benchmarking & Analiză (Faza 3 & 4 - Nealocați):
+1. **Metrici Boot Time:** Extragerea timpului de boot direct din log-urile QEMU.
+2. **Dimensiunea Imaginii & RAM:** Salvarea mărimii imaginii compilate și măsurarea consumului de memorie real în sistemul gazdă.
+3. **Benchmarking Dinamic:** Integrarea automată a utilitarului de load testing `wrk` (pentru RPS și Latență).
+4. **Agregarea Datelor:** Exportarea finală a metricilor (CSV/JSON) și generarea viitoare de grafice (ex. Matplotlib).
