@@ -1,0 +1,17 @@
+A new version of KraftKit is now available (v0.12.16)!
+
+Please update KraftKit through your local package manager or run:
+
+curl --proto '=https' --tlsv1.2 -sSf https://get.kraftkit.sh | sh
+
+Read the full changelog:
+
+https://github.com/unikraft/kraftkit/releases/tag/v0.12.16
+
+To turn off this check, set:
+
+export KRAFTKIT_NO_CHECK_UPDATES=true
+
+Or use the globally accessible flag '--no-check-updates'.
+
+		level=info msg="updating index"

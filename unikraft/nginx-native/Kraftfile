@@ -20,6 +20,7 @@ cmd: ["-c", "/conf/nginx.conf"]
 cmd: ["-c", "/nginx/conf/nginx.conf"]
 
 kconfig:
+  CONFIG_LIBMUSL_AIO: n
   CONFIG_LIBVFSCORE_AUTOMOUNT_ROOTFS: y
   CONFIG_LIBVFSCORE_ROOTFS: '"ramfs"'
   CONFIG_LIBVFSCORE_ROOTFS_RAMFS: y

@@ -5,15 +5,15 @@ import time
 import os
 import urllib.request
 import teardown
+import threading
+import re
 
-def wait_for_port(port, timeout=10):
-    """Așteaptă până când aplicația răspunde pe portul specificat."""
+def wait_for_port(port, timeout=15):
     print(f">> Așteptare bootare și inițializare (port {port})...")
     start_time = time.time()
     while time.time() - start_time < timeout:
         try:
-            # Setează un timeout scurt pentru socket ca să nu rămână agățat
-            response = urllib.request.urlopen(f"http://localhost:{port}", timeout=1)
+            response = urllib.request.urlopen(f"http://127.0.0.1:{port}", timeout=1)
             if response.getcode() == 200:
                 print(f"[OK] Instanța a bootat și răspunde corect pe portul {port}.")
                 return True
@@ -26,6 +26,23 @@ def wait_for_port(port, timeout=10):
 def clean_kraft_instance(name):
     """Șterge instanța din baza de date kraft pentru a evita erori 'name already in use'."""
     subprocess.run(["kraft", "rm", name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+def monitor_boot_time(process, start_time, target_log, instance_name):
+    last_internal_time = None
+    for line in iter(process.stdout.readline, ''):
+        # Căutăm un pattern de tip [0.229735] sau [  0.01234 ]
+        match = re.search(r'\[\s*([\d\.]+)\s*\]', line)
+        if match:
+            last_internal_time = match.group(1)
+            
+        if target_log in line:
+            boot_duration = time.time() - start_time
+            print(f"[Metrică Host] {instance_name} a bootat în {boot_duration:.4f} secunde (End-to-End).")
+            if last_internal_time:
+                print(f"[Metrică Internă] {instance_name} timp intern din log: {last_internal_time} secunde.")
+            else:
+                print(f"[Metrică Internă] {instance_name} nu a afișat timestamp intern în loguri.")
+            target_log = "FOUND_ALREADY"
 
 def run_unikraft_native():
     print("\n=== Rulare Benchmark: Unikraft Native ===")
@@ -41,10 +58,16 @@ def run_unikraft_native():
     
     # 2. Lansare folosind limitele hardware din teardown.py
     flags = teardown.get_isolation_flags("unikraft")
-    cmd = ["kraft", "run", "-p", "8080:80", "--rm", "-d", "--name", "nginx-native"] + flags
-    print(">> Se rulează QEMU:", " ".join(cmd))
-    
-    subprocess.run(cmd, cwd=cwd, check=True)
+    cmd = ["kraft", "run", "-p", "8080:80", "--rm", "--name", "nginx-native"] + flags
+
+    start_time = time.time()
+    process = subprocess.Popen(cmd, cwd = cwd, stdout = subprocess.PIPE, stderr = subprocess.STDOUT, stdin = subprocess.DEVNULL, text = True)
+    log_thread = threading.Thread(target = monitor_boot_time, args = (process, start_time, "Interface is up", "Unikraft Native"))
+    log_thread.daemon = True
+    log_thread.start()
+
+    # print(">> Se rulează QEMU:", " ".join(cmd))
+    # subprocess.run(cmd, cwd=cwd, check=True)
     
     # 3. Așteaptă Nginx
     wait_for_port(8080)
@@ -56,11 +79,17 @@ def run_unikraft_bincompat():
     
     flags = teardown.get_isolation_flags("unikraft")
     base_image = "unikraft.org/base:latest"
-    cmd = ["kraft", "run", "-p", "8080:8080", "--rm", "-d", "--name", "nginx-bincompat", 
-           "--rootfs", "./rootfs"] + flags + [base_image, "--", "/nginx", "-c", "/etc/nginx/nginx.conf"]
+    cmd = ["kraft", "run", "-p", "8080:80", "--rm", "--name", "nginx-bincompat", 
+       "--rootfs", "./rootfs"] + flags + [base_image, "--", "/nginx", "-c", "/etc/nginx/nginx.conf"]
     print(">> Se rulează QEMU:", " ".join(cmd))
-    
-    subprocess.run(cmd, cwd=cwd, check=True)
+
+    start_time = time.time()
+    process = subprocess.Popen(cmd, cwd = cwd, stdout = subprocess.PIPE, stderr = subprocess.STDOUT, stdin = subprocess.DEVNULL, text = True)
+    log_thread = threading.Thread(target = monitor_boot_time, args = (process, start_time, "Interface is up", "Unikraft Bincompat"))
+    log_thread.daemon = True
+    log_thread.start()
+
+    # subprocess.run(cmd, cwd=cwd, check=True)
     
     # Așteaptă Nginx
     wait_for_port(8080)
@@ -73,9 +102,15 @@ def run_nanovms():
     # ops mapează automat porturile prin opțiunea -p
     cmd = ["ops", "pkg", "load", "eyberg/nginx:1.18.0", "-c", "config.json", "-p", "8080"] + flags
     print(">> Se rulează QEMU (prin ops):", " ".join(cmd))
+
+    start_time = time.time()
+    process = subprocess.Popen(cmd, cwd = cwd, stdout = subprocess.PIPE, stderr = subprocess.STDOUT, stdin = subprocess.DEVNULL, text = True)
+    log_thread = threading.Thread(target = monitor_boot_time, args = (process, start_time, "assigned", "NanoVMs"))
+    log_thread.daemon = True
+    log_thread.start()
     
     # NanoVMs rulează default în foreground, așa că folosim Popen
-    process = subprocess.Popen(cmd, cwd=cwd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    # process = subprocess.Popen(cmd, cwd=cwd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     
     # Așteaptă Nginx
     wait_for_port(8080)
