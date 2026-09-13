@@ -15,18 +15,19 @@ Mai jos este prezentată o analiză detaliată a ceea ce s-a implementat pe fiec
 *   **Stadiu Baseline NanoVMs:** ✅ **Finalizat**. Configurația pentru NanoVMs (fișierele `config.json` și `etc/nginx/nginx.conf` cu redirectare pe portul 8080) a fost implementată cu succes. Eroarea de boot cauzată de lipsa directoarelor goale la clonarea cu Git a fost remediată (prin adăugarea fișierelor `.gitkeep` în `/tmp`).
 *   **Stadiu Teardown & Izolare:** ✅ **Finalizat**. Scriptul `teardown.py` limitează corect hardware-ul (1 vCPU, 512MB RAM) și distruge curat instanțele QEMU "orfane" folosind `SIGKILL` prin `psutil`. A fost integrat cu succes în Orchestrator.
 
-### 3. Faza 3: Colecția de Metrici (În Progres)
-*   **Metrici Boot Time:** ✅ **Finalizat**. S-a implementat extragerea timpului de boot direct în `orchestrator.py` folosind fire de execuție (Threads) pentru parsarea asincronă a logurilor. Framework-ul colectează acum două metrici:
-    * **Timpul Host (End-to-End)**: calculat din Python (Time-to-Network).
-    * **Timpul Intern (Pur)**: extras prin expresii regulate direct din output-ul mașinii virtuale (activat cu succes pe NanoVMs; ignorat intenționat pentru Unikraft în favoarea metricii End-to-End pentru a menține stabilitatea pe versiunile *stable*).
+### 3. Faza 3: Colecția de Metrici (Finalizată)
+*   **Metrici Boot Time:** ✅ **Finalizat**. S-a implementat extragerea timpului de boot în `orchestrator.py` folosind threads pentru parsarea asincronă a logurilor (colectând atât Timpul Host End-to-End, cât și Timpul Intern pe NanoVMs).
+*   **Dimensiunea Imaginii:** ✅ **Finalizat**. Calculată direct de pe disc pentru fiecare arhitectură (inclusiv adunarea imaginii de bază din cache-ul KraftKit pentru Bincompat).
+*   **Consum RAM (Idle & Peak):** ✅ **Finalizat**. S-a implementat monitorizarea prin `psutil` pe toate child-procesele, înregistrând atât repausul (Idle) imediat după boot, cât și vârful de sarcină (Peak RAM) în timpul benchmark-ului asincron.
+*   **Benchmarking Dinamic & Agregare Date:** ✅ **Finalizat**. Integrarea executabilului `wrk` direct în Python, rularea unui test de trafic Nginx, extragerea metricilor de *RPS* și *Latență* prin expresii regulate, și exportarea tuturor datelor într-un fișier consolidat `benchmark_results.json`.
 
 ---
 
-## Ce mai trebuie adăugat / Implementat (Pașii Următori)
+## Ce mai trebuie adăugat / Implementat (Pașii Următori - Faza 4)
 
-Efortul se va concentra pe finalizarea următoarelor metrici statice și rularea benchmark-urilor dinamice:
+Framework-ul este stabil și extrage automat toate metricile. Singurul efort rămas constă în vizualizarea acestora:
 
-1. **Dimensiunea Imaginii & RAM:** Salvarea mărimii imaginilor compilate și implementarea unui mecanism de monitorizare a procesului QEMU direct din sistemul de operare gazdă (host) pentru a înregistra RAM-ul consumat efectiv.
-2. **Benchmarking Dinamic (Rețea):** Integrarea automată a utilitarului de load testing `wrk` imediat după boot-area instanțelor (folosind starea de "[OK]" generată de orchestrator) pentru a măsura *Requests Per Second (RPS)* și Latența.
-3. **Agregarea Datelor & Export:** Structurarea tuturor metricilor colectate (statice și dinamice) și salvarea acestora într-un format brut standardizat (CSV sau JSON).
-4. **Generarea Graficelor (Extensii Viitoare):** Crearea de scripturi adiționale (ex. Matplotlib) pentru parsarea fișierelor exportate și generarea de grafice comparative între Nginx Nativ, Bincompat și NanoVMs.
+1. **Generarea Graficelor (Faza 4):** Crearea unui script separat (de ex. folosind `matplotlib` sau `pandas` în Python) care va parsa fișierul `benchmark_results.json` rezultat din Orchestrator și va genera grafice comparative (bar charts) între:
+   * **Boot Time:** Nativ vs Bincompat vs NanoVMs.
+   * **Resource Usage:** Idle RAM vs Peak RAM și Image Size.
+   * **Network Performance:** Requests Per Second (RPS) și Latency.
