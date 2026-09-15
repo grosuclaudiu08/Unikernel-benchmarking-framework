@@ -1,1 +1,3 @@
-matplotlib\nnumpy\npsutil
+matplotlib
+numpy
+psutil
