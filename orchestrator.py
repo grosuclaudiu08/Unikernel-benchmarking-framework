@@ -123,7 +123,11 @@ def run_unikraft_native():
     # 1. Build dacă nu există deja
     if not os.path.exists(os.path.join(cwd, ".unikraft/build/nginx-native_qemu-x86_64")):
         print(">> Imaginea nativă lipsește. Se rulează 'kraft build'...")
-        subprocess.run(["kraft", "build"], cwd=cwd, check=True)
+        try:
+            subprocess.run(["kraft", "build"], cwd=cwd, check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"[EROARE] 'kraft build' a eșuat. Probabil lipsesc dependențe pe sistem (ex. yacc/bison).")
+            return None
     else:
         print(">> Imaginea nativă există deja, sărim peste compilare.")
     
@@ -183,7 +187,7 @@ def run_unikraft_bincompat():
     
     flags = teardown.get_isolation_flags("unikraft")
     base_image = "unikraft.org/base:latest"
-    cmd = ["kraft", "run", "--no-prompt", "-p", "8080:80", "--rm", "--name", "nginx-bincompat", 
+    cmd = ["kraft", "run", "--no-prompt", "-p", "8080:8080", "--rm", "--name", "nginx-bincompat", 
        "--rootfs", "./rootfs"] + flags + [base_image, "--", "/nginx", "-c", "/etc/nginx/nginx.conf"]
     print(">> Se rulează QEMU:", " ".join(cmd))
 
