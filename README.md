@@ -1,31 +1,72 @@
-# Unikernel Benchmarking Framework
+# Unikernel Nginx Benchmarking Framework
 
-Acest proiect își propune să creeze un cadru de benchmarking automatizat pentru compararea unikernel-urilor, utilizând ca referințe Unikraft și NanoVMs. Aplicația țintă pentru evaluare este un server web Nginx.
+Acest proiect este un cadru de testare automatizată (*Benchmarking Framework*) complet, construit în Python, destinat măsurării și comparării performanțelor aplicațiilor web (Nginx) rulate sub formă de Unikernel-uri. 
 
-## Stadiul Proiectului (Status Curent)
+Framework-ul evaluează și compară direct următoarele trei arhitecturi de virtualizare:
+1. **Unikraft Nginx-Native** (Compilare directă din cod sursă Nginx pentru Unikraft)
+2. **Unikraft Nginx-Bincompat** (Execuție prin elfloader folosind binarul standard de Linux)
+3. **NanoVMs (OPS)** (Execuție rapidă folosind ecosistemul NanoVMs)
 
-Mai jos este prezentată o analiză detaliată a ceea ce s-a implementat pe fiecare componentă/branch, precum și erorile sau omisiunile corectate.
+## Metrici Colectate Automat
 
-### 1. Partea Persoanei 1 (Unikraft & Orchestrator Core)
-*   **Stadiu Nginx Nativ:** ✅ **Finalizat**. S-a creat cu succes mediul pentru Nginx Nativ pe Unikraft (în folderul `unikraft/nginx-native/`). S-a corectat montarea sistemului de fișiere (CPIO Initramfs prin mecanismul CI) și s-a ignorat corect output-ul de build (`.gitignore`).
-*   **Stadiu Nginx Bincompat (app-elfloader):** ✅ **Finalizat**. S-a implementat varianta de Nginx rulată prin compatibilitate binară folosind Unikraft `app-elfloader`. Tot sistemul de fișiere de Linux și librăriile necesare se află în `unikraft/nginx-bincompat/`.
-*   **Stadiu Orchestrator Core:** ✅ **Finalizat**. A fost creat scriptul central `orchestrator.py` care preia parametrii din CLI (ex. `--target unikraft-native`, `--target all`), rulează procesele (construcție și lansare), execută o validare "health check" pe portul 8080 și gestionează instanțele în fundal, integrând izolarea și curățarea din `teardown.py`.
-
-### 2. Partea Persoanei 2 (NanoVMs & Teardown/Isolation)
-*   **Stadiu Baseline NanoVMs:** ✅ **Finalizat**. Configurația pentru NanoVMs (fișierele `config.json` și `etc/nginx/nginx.conf` cu redirectare pe portul 8080) a fost implementată cu succes. Eroarea de boot cauzată de lipsa directoarelor goale la clonarea cu Git a fost remediată (prin adăugarea fișierelor `.gitkeep` în `/tmp`).
-*   **Stadiu Teardown & Izolare:** ✅ **Finalizat**. Scriptul `teardown.py` limitează corect hardware-ul (1 vCPU, 512MB RAM) și distruge curat instanțele QEMU "orfane" folosind `SIGKILL` prin `psutil`. A fost integrat cu succes în Orchestrator.
-
-### 3. Faza 3: Colecția de Metrici (Finalizată)
-*   **Metrici Boot Time:** ✅ **Finalizat**. S-a implementat extragerea timpului de boot în `orchestrator.py` folosind threads pentru parsarea asincronă a logurilor (colectând atât Timpul Host End-to-End, cât și Timpul Intern pe NanoVMs).
-*   **Dimensiunea Imaginii:** ✅ **Finalizat**. Calculată direct de pe disc pentru fiecare arhitectură (inclusiv adunarea imaginii de bază din cache-ul KraftKit pentru Bincompat).
-*   **Consum RAM (Idle & Peak):** ✅ **Finalizat**. S-a implementat monitorizarea prin `psutil` pe toate child-procesele, înregistrând atât repausul (Idle) imediat după boot, cât și vârful de sarcină (Peak RAM) în timpul benchmark-ului asincron.
-*   **Benchmarking Dinamic & Agregare Date:** ✅ **Finalizat**. Integrarea executabilului `wrk` direct în Python, rularea unui test de trafic Nginx, extragerea metricilor de *RPS* și *Latență* prin expresii regulate, și exportarea tuturor datelor într-un fișier consolidat `benchmark_results.json`.
+Pe parcursul testării (care izolează strict fiecare mașină virtuală la **1 vCPU și 512MB RAM**), sistemul colectează următoarele date:
+* **Host Boot Time:** Timpul real (End-to-End) de când se trimite comanda către hypervisor (QEMU) până când portul 8080 este gata să primească trafic.
+* **Internal Boot Time:** Timpul de boot raportat de nucleul intern al unikernel-ului.
+* **Idle RAM vs Peak RAM:** Memoria consumată în stare de repaus imediat după boot, versus vârful de consum înregistrat asincron sub un trafic extrem de mare.
+* **Image Size:** Spațiul real pe disc ocupat de imaginea compilată (inclusiv kernelul de bază).
+* **RPS & Latency:** Măsurate folosind utilitarul `wrk` (Requests Per Second și Latența medie de răspuns).
 
 ---
 
-## Ce mai trebuie adăugat / Implementat (Pașii Următori - Faza 4)
+## Instalare și Configurare (Setup)
 
-Framework-ul este **COMPLET**.
-1. **Generarea Graficelor (Faza 4):** ✅ **Finalizat**. A fost creat scriptul `plot_metrics.py` care citește datele din `benchmark_results.json` și generează diagrame vizuale (bar charts) cu Matplotlib. Graficele comparative pentru Boot Time, RAM Usage, Image Size, RPS și Latență sunt salvate automat în folderul `graphs/`.
-   - Pentru a rula graficele, trebuie instalate dependențele: `pip install -r requirements.txt`
-   - Apoi se execută: `python3 plot_metrics.py`
+Proiectul necesită instalarea unor dependențe la nivel de sistem (Hypervisor, `wrk`, Python, KraftKit, ops). Pentru a automatiza complet procesul, a fost creat un script de setup care va pregăti calculatorul automat.
+
+Rulează pur și simplu în terminal:
+```bash
+./setup.sh
+```
+*(Acesta va cere parola de `sudo` pentru pachetele `apt` și va descărca automat utilitarele necesare pentru mediul de virtualizare).*
+
+---
+
+## Modul de Utilizare
+
+Proiectul beneficiază de un **CLI Interactiv**, complet decuplat de logica de orchestrator (pentru un output curat și elegant, fără avalanșe de log-uri). 
+
+Punctul unic de intrare în framework este comanda:
+```bash
+./uni_benchmark
+```
+
+### 1. Modul Interactiv (Meniu)
+Dacă rulezi comanda fără niciun parametru, vei fi întâmpinat de un meniu ASCII de unde poți selecta cu cifrele `1`, `2`, `3` ce componentă dorești să testezi, sau `4` pentru a testa complet toată suita. În timpul rulării, o animație (`Spinner`) va indica stadiul.
+
+### 2. Modul Automat (Selective Target)
+Dacă folosești framework-ul într-un pipeline CI/CD sau dorești să sari peste meniul interactiv, poți rula un test specific folosind flag-ul `--target`:
+```bash
+./uni_benchmark --target nanovms
+./uni_benchmark --target all
+```
+*Opțiuni valide:* `unikraft-native`, `unikraft-bincompat`, `nanovms`, `all`.
+
+### 3. Modul de Debugging (Erori și Log-uri)
+În mod implicit, fișierul `uni_benchmark` ascunde complet toate output-urile utilitarelor de fundal (`orchestrator.py` și `teardown.py`) pentru a păstra consola vizual curată. 
+
+Dacă un unikernel eșuează (ex: eroare de compilare GCC), interfața va "prinde" eroarea și va trece mai departe afișând un mesaj de EȘEC. Dacă dorești să analizezi exact **ce s-a stricat**, adaugă flag-ul `--debug`:
+```bash
+./uni_benchmark --debug
+./uni_benchmark --target unikraft-native --debug
+```
+*Acest flag va opri spinner-ul și va elibera în consolă absolut tot fluxul original de log-uri (comenzile rulate, output-ul compilatorului, timpii extrași din regex, log-urile wrk).*
+
+Poți vedea lista de instrucțiuni oricând cu: `./uni_benchmark --help` sau `-h`.
+
+---
+
+## 📈 Rezultate și Grafice Automate
+
+La finalul unui benchmark de succes:
+1. Datele sunt formatate pe ecran sub forma unui tabel frumos structurat.
+2. Datele brute sunt exportate în fișierul `benchmark_results.json` (care este protejat de Git pentru a nu stârni conflicte între calculatoare cu hardware diferit).
+3. Scriptul apelează **automat** modulul `plot_metrics.py`. Acesta analizează JSON-ul și va desena / genera imediat scheme grafice comparative `.png` de înaltă rezoluție în folderul `graphs/`, gata de a fi atașate în rapoarte de cercetare sau lucrări de licență!

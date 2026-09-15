@@ -29,12 +29,13 @@ class HiddenPrints:
             sys.stdout = self._original_stdout
 
 def animate_spinner(message, stop_event):
+    """Afișează un spinner de așteptare pentru a indica progresul."""
     spinner = itertools.cycle(['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'])
     while not stop_event.is_set():
-        sys.stdout.write(f'\r\033[1;36m{next(spinner)}\033[0m \033[37m{message}\033[0m')
-        sys.stdout.flush()
+        sys.__stdout__.write(f'\r\033[1;36m{next(spinner)}\033[0m \033[37m{message}\033[0m')
+        sys.__stdout__.flush()
         time.sleep(0.1)
-    sys.stdout.write('\r\033[K')
+    sys.__stdout__.write('\r\033[K')
 
 def run_target(target_name, run_func):
     print(f"\n\033[1;33m>>> Inițializare benchmark:\033[0m \033[1;37m{target_name}\033[0m")
