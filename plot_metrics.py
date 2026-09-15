@@ -4,12 +4,17 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 def parse_latency(lat_str):
-    """Converts a latency string like '12.22ms' to float."""
-    if isinstance(lat_str, str):
-        if lat_str.endswith('ms'):
-            return float(lat_str.replace('ms', ''))
-        elif lat_str.endswith('s'):
-            return float(lat_str.replace('s', '')) * 1000
+    """Converts a latency string like '12.22ms' to milliseconds."""
+    if not isinstance(lat_str, str):
+        return float(lat_str)
+    if lat_str == "N/A":
+        return float("nan")
+    if lat_str.endswith('ms'):
+        return float(lat_str[:-2])
+    if lat_str.endswith('us'):
+        return float(lat_str[:-2]) / 1000
+    if lat_str.endswith('s'):
+        return float(lat_str[:-1]) * 1000
     return float(lat_str)
 
 def main():

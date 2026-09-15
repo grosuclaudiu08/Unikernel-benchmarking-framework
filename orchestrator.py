@@ -126,18 +126,8 @@ def run_unikraft_native():
         try:
             subprocess.run(["kraft", "build"], cwd=cwd, check=True)
         except subprocess.CalledProcessError as e:
-            print(f"[EROARE] 'kraft build' a eșuat (posibil GCC 14 sau dependențe lipsă). Utilizăm date de fallback pentru grafice...")
-            # Fallback data based on previous successful WSL runs
-            return {
-                "target": "unikraft-native",
-                "idle_ram_mb": 18.5,
-                "peak_ram_mb": 25.1,
-                "image_size_mb": 3.2,
-                "host_boot_time": 0.08,
-                "internal_boot_time": 0.02,
-                "rps": 120500.0,
-                "latency": "2.1ms"
-            }
+            print(f"[EROARE] 'kraft build' a eșuat: {e}")
+            raise
     else:
         print(">> Imaginea nativă există deja, sărim peste compilare.")
     
@@ -197,7 +187,7 @@ def run_unikraft_bincompat():
     
     flags = teardown.get_isolation_flags("unikraft")
     base_image = "unikraft.org/base:latest"
-    cmd = ["kraft", "run", "--no-prompt", "-p", "8080:8080", "--rm", "--name", "nginx-bincompat", 
+    cmd = ["kraft", "run", "--no-prompt", "-p", "8080:80", "--rm", "--name", "nginx-bincompat", 
        "--rootfs", "./rootfs"] + flags + [base_image, "--", "/nginx", "-c", "/etc/nginx/nginx.conf"]
     print(">> Se rulează QEMU:", " ".join(cmd))
 
