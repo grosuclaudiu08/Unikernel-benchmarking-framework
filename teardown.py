@@ -23,12 +23,17 @@ def get_isolation_flags(engine: str) -> list:
     else:
         raise ValueError(f"Engine necunoscut: {engine}")
 
+DEBUG_MODE = False
+def dprint(*args, **kwargs):
+    if DEBUG_MODE:
+        print(*args, **kwargs)
+
 def teardown_qemu():
     """
     Identifică și ucide procesele QEMU rulate, asigurând curățarea după benchmark.
     Folosește SIGKILL pentru oprire forțată.
     """
-    print("Se execută teardown: căutare procese QEMU rămase...")
+    dprint("Se execută teardown: căutare procese QEMU rămase...")
     killed_count = 0
     for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
         try:
@@ -37,7 +42,7 @@ def teardown_qemu():
             
             # Căutăm procesul QEMU
             if name and 'qemu-system' in name:
-                print(f"S-a găsit procesul QEMU cu PID {proc.info['pid']}. Se trimite SIGKILL...")
+                dprint(f"S-a găsit procesul QEMU cu PID {proc.info['pid']}. Se trimite SIGKILL...")
                 os.kill(proc.info['pid'], signal.SIGKILL)
                 killed_count += 1
                 
@@ -45,9 +50,9 @@ def teardown_qemu():
             pass
             
     if killed_count == 0:
-        print("Nu s-au găsit procese QEMU de curățat.")
+        dprint("Nu s-au găsit procese QEMU de curățat.")
     else:
-        print(f"S-au ucis {killed_count} procese QEMU.")
+        dprint(f"S-au ucis {killed_count} procese QEMU.")
 
 # Înregistrăm funcția de teardown pentru a rula la ieșirea scriptului
 atexit.register(teardown_qemu)

@@ -10,19 +10,24 @@ import re
 import psutil
 import json
 
+DEBUG_MODE = False
+def dprint(*args, **kwargs):
+    if DEBUG_MODE:
+        print(*args, **kwargs)
+
 def wait_for_port(port, timeout=15):
-    print(f">> Așteptare bootare și inițializare (port {port})...")
+    dprint(f">> Așteptare bootare și inițializare (port {port})...")
     start_time = time.time()
     while time.time() - start_time < timeout:
         try:
             response = urllib.request.urlopen(f"http://127.0.0.1:{port}", timeout=1)
             if response.getcode() == 200:
-                print(f"[OK] Instanța a bootat și răspunde corect pe portul {port}.")
+                dprint(f"[OK] Instanța a bootat și răspunde corect pe portul {port}.")
                 return True
         except Exception:
             pass
         time.sleep(0.5)
-    print(f"[EROARE] Timeout de {timeout}s la așteptarea portului {port}.")
+    dprint(f"[EROARE] Timeout de {timeout}s la așteptarea portului {port}.")
     return False
 
 def clean_kraft_instance(name):
@@ -41,13 +46,13 @@ def monitor_boot_time(process, start_time, target_log, instance_name, boot_data)
             boot_duration = time.time() - start_time
             boot_data["host_boot_time"] = round(boot_duration, 4)
 
-            print(f"[Metrică Host] {instance_name} a bootat în {boot_duration:.4f} secunde (End-to-End).")
+            dprint(f"[Metrică Host] {instance_name} a bootat în {boot_duration:.4f} secunde (End-to-End).")
             if last_internal_time:
                 boot_data["internal_boot_time"] = float(last_internal_time)
-                print(f"[Metrică Internă] {instance_name} timp intern din log: {last_internal_time} secunde.")
+                dprint(f"[Metrică Internă] {instance_name} timp intern din log: {last_internal_time} secunde.")
             else:
                 boot_data["internal_boot_time"] = None
-                print(f"[Metrică Internă] {instance_name} nu a afișat timestamp intern în loguri.")
+                dprint(f"[Metrică Internă] {instance_name} nu a afișat timestamp intern în loguri.")
             target_log = "FOUND_ALREADY"
 
 def measure_ram_usage(process):
@@ -77,7 +82,7 @@ def get_image_size_mb(filepath):
 
 def get_kraft_base_image_size(image_name="unikraft.org/base:latest"):
     try:
-        result = subprocess.run(["kraft", "pkg", "ls", "-o", "json"], stdout=subprocess.PIPE, text=True)
+        result = subprocess.run(["kraft", "pkg", "ls", "-o", "json"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
         packages = json.loads(result.stdout)
         for pkg in packages:
             # Pachetul conține tag-ul în nume sau e "unikraft.org/base" cu version "latest"
@@ -94,7 +99,7 @@ def get_kraft_base_image_size(image_name="unikraft.org/base:latest"):
 def run_wrk_benchmark(url="http://127.0.0.1:8080", duration="10s", connections=100, threads=2):
     try:
         cmd = ["wrk", f"-t{threads}", f"-c{connections}", f"-d{duration}", url]
-        print(f">> Se rulează wrk: {' '.join(cmd)}")
+        dprint(f">> Se rulează wrk: {' '.join(cmd)}")
         
         result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
         output = result.stdout
@@ -105,70 +110,63 @@ def run_wrk_benchmark(url="http://127.0.0.1:8080", duration="10s", connections=1
         latency = latency_match.group(1) if latency_match else "N/A"
         rps = float(rps_match.group(1)) if rps_match else 0.0
         
-        print(f"[Metrică Rețea] RPS: {rps}, Latență: {latency}")
+        dprint(f"[Metrică Rețea] RPS: {rps}, Latență: {latency}")
         return {"rps": rps, "latency": latency}
         
     except FileNotFoundError:
-        print("[EROARE] Utilitarul 'wrk' nu este instalat.")
+        dprint("[EROARE] Utilitarul 'wrk' nu este instalat.")
         return {"rps": 0.0, "latency": "N/A"}
     except subprocess.CalledProcessError as e:
-        print(f"[EROARE] wrk a eșuat: {e.stderr}")
+        dprint(f"[EROARE] wrk a eșuat: {e.stderr}")
         return {"rps": 0.0, "latency": "N/A"}
 
 def run_unikraft_native():
-    print("\n=== Rulare Benchmark: Unikraft Native ===")
+    dprint("\n=== Rulare Benchmark: Unikraft Native ===")
     cwd = "unikraft/nginx-native"
     clean_kraft_instance("nginx-native")
     
     # 1. Build dacă nu există deja
     if not os.path.exists(os.path.join(cwd, ".unikraft/build/nginx-native_qemu-x86_64")):
-        print(">> Imaginea nativă lipsește. Se rulează 'kraft build'...")
+        dprint(">> Imaginea nativă lipsește. Se rulează 'kraft build'...")
         try:
-            subprocess.run(["kraft", "build"], cwd=cwd, check=True)
+            subprocess.run(["kraft", "build"], cwd=cwd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except subprocess.CalledProcessError as e:
-            print(f"[EROARE] 'kraft build' a eșuat (posibil GCC 14 sau dependențe lipsă). Utilizăm date de fallback pentru grafice...")
-            # Fallback data based on previous successful WSL runs
-            return {
-                "target": "unikraft-native",
-                "idle_ram_mb": 18.5,
-                "peak_ram_mb": 25.1,
-                "image_size_mb": 3.2,
-                "host_boot_time": 0.08,
-                "internal_boot_time": 0.02,
-                "rps": 120500.0,
-                "latency": "2.1ms"
-            }
+            dprint(f"[EROARE] 'kraft build' a eșuat!")
+            return {}
     else:
-        print(">> Imaginea nativă există deja, sărim peste compilare.")
+        dprint(">> Imaginea nativă există deja, sărim peste compilare.")
     
-    # 2. Lansare folosind limitele hardware din teardown.py
     flags = teardown.get_isolation_flags("unikraft")
     cmd = ["kraft", "run", "-p", "8080:80", "--rm", "--name", "nginx-native"] + flags
 
     start_time = time.time()
     process = subprocess.Popen(cmd, cwd = cwd, stdout = subprocess.PIPE, stderr = subprocess.STDOUT, stdin = subprocess.DEVNULL, text = True)
 
+    # Boot time
     boot_data = {}
     log_thread = threading.Thread(target = monitor_boot_time, args = (process, start_time, "Interface is up", "Unikraft Native", boot_data))
     log_thread.daemon = True
     log_thread.start()
     
-    # 3. Așteaptă Nginx
     is_ready = wait_for_port(8080)
     metrics = {}
 
     if is_ready:
         time.sleep(0.5)
-        idle_ram_mb = measure_ram_usage(process)
+
+        # Image size
         image_path = os.path.join(cwd, ".unikraft/build/nginx-native_qemu-x86_64")
         image_size = get_image_size_mb(image_path)
 
+        # Ram
+        idle_ram_mb = measure_ram_usage(process)
         stop_ram_event = threading.Event()
         ram_data = {}
         ram_thread = threading.Thread(target=monitor_peak_ram, args=(process, stop_ram_event, ram_data))
         ram_thread.daemon = True
         ram_thread.start()
 
+        # Latency & rps
         wrk_metrics = run_wrk_benchmark()
 
         stop_ram_event.set()
@@ -186,48 +184,55 @@ def run_unikraft_native():
             "latency": wrk_metrics["latency"]
         }
 
-        print(f"[Metrică Finală] {metrics}")
+        dprint(f"[Metrică Finală] {metrics}")
 
     return metrics
 
 def run_unikraft_bincompat():
-    print("\n=== Rulare Benchmark: Unikraft Bincompat ===")
+    dprint("\n=== Rulare Benchmark: Unikraft Bincompat ===")
     cwd = "unikraft/nginx-bincompat"
     clean_kraft_instance("nginx-bincompat")
     
-    flags = teardown.get_isolation_flags("unikraft")
+    dprint(">> Verificare și deduplicare cache imagine de bază ...")
     base_image = "unikraft.org/base:latest"
-    cmd = ["kraft", "run", "--no-prompt", "-p", "8080:8080", "--rm", "--name", "nginx-bincompat", 
+    subprocess.run(["kraft", "pkg", "rm", base_image], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(["kraft", "pkg", "pull", base_image], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    
+    flags = teardown.get_isolation_flags("unikraft")
+    cmd = ["kraft", "run", "--no-prompt", "-p", "8080:80", "--rm", "--name", "nginx-bincompat", 
        "--rootfs", "./rootfs"] + flags + [base_image, "--", "/nginx", "-c", "/etc/nginx/nginx.conf"]
-    print(">> Se rulează QEMU:", " ".join(cmd))
+    dprint(">> Se rulează QEMU:", " ".join(cmd))
 
     start_time = time.time()
     process = subprocess.Popen(cmd, cwd = cwd, stdout = subprocess.PIPE, stderr = subprocess.STDOUT, stdin = subprocess.DEVNULL, text = True)
 
+    # Boot time
     boot_data = {}
     log_thread = threading.Thread(target = monitor_boot_time, args = (process, start_time, "Interface is up", "Unikraft Bincompat", boot_data))
     log_thread.daemon = True
     log_thread.start()
 
-    # Așteaptă Nginx
     is_ready = wait_for_port(8080)
     metrics = {}
 
     if is_ready:
         time.sleep(0.5)
-        idle_ram_mb = measure_ram_usage(process)
-        
+
+        # Image size
         base_image_size = get_kraft_base_image_size(base_image)
         image_path = os.path.join(cwd, "rootfs/nginx")
         nginx_size = get_image_size_mb(image_path)
         total_image_size = base_image_size + nginx_size
 
+        # Ram
+        idle_ram_mb = measure_ram_usage(process)
         stop_ram_event = threading.Event()
         ram_data = {}
         ram_thread = threading.Thread(target=monitor_peak_ram, args=(process, stop_ram_event, ram_data))
         ram_thread.daemon = True
         ram_thread.start()
 
+        # Latency & rps
         wrk_metrics = run_wrk_benchmark()
 
         stop_ram_event.set()
@@ -244,42 +249,47 @@ def run_unikraft_bincompat():
             "rps": wrk_metrics["rps"],
             "latency": wrk_metrics["latency"]
         }
-        print(f"[Metrică Finală] {metrics}")
+        dprint(f"[Metrică Finală] {metrics}")
 
     return metrics
 
 def run_nanovms():
-    print("\n=== Rulare Benchmark: NanoVMs ===")
+    dprint("\n=== Rulare Benchmark: NanoVMs ===")
     cwd = "nanovms/nginx"
     
     flags = teardown.get_isolation_flags("nanovms")
     # ops mapează automat porturile prin opțiunea -p
     cmd = ["ops", "pkg", "load", "eyberg/nginx:1.18.0", "-c", "config.json", "-p", "8080"] + flags
-    print(">> Se rulează QEMU (prin ops):", " ".join(cmd))
+    dprint(">> Se rulează QEMU (prin ops):", " ".join(cmd))
 
     start_time = time.time()
     process = subprocess.Popen(cmd, cwd = cwd, stdout = subprocess.PIPE, stderr = subprocess.STDOUT, stdin = subprocess.DEVNULL, text = True,)
 
+    # Boot time
     boot_data = {}
     log_thread = threading.Thread(target = monitor_boot_time, args = (process, start_time, "assigned", "NanoVMs", boot_data))
     log_thread.daemon = True
     log_thread.start()
     
-    # Așteaptă Nginx
     is_ready = wait_for_port(8080)
     metrics = {}
+
     if is_ready:
             time.sleep(0.5)
-            idle_ram_mb = measure_ram_usage(process)
+
+            # Image size
             image_path = os.path.expanduser("~/.ops/images/nginx")
             image_size = get_image_size_mb(image_path)
 
+            # Ram
+            idle_ram_mb = measure_ram_usage(process)
             stop_ram_event = threading.Event()
             ram_data = {}
             ram_thread = threading.Thread(target=monitor_peak_ram, args=(process, stop_ram_event, ram_data))
             ram_thread.daemon = True
             ram_thread.start()
 
+            # Latency & rps
             wrk_metrics = run_wrk_benchmark()
 
             stop_ram_event.set()
@@ -296,72 +306,7 @@ def run_nanovms():
                 "rps": wrk_metrics["rps"],
                 "latency": wrk_metrics["latency"]
             }
-            print(f"[Metrică Finală] {metrics}")
+            dprint(f"[Metrică Finală] {metrics}")
     
     return metrics
-
-def main():
-    parser = argparse.ArgumentParser(description="Unikernel Benchmarking Orchestrator (Phase 2)")
-    parser.add_argument("--target", choices=["unikraft-native", "unikraft-bincompat", "nanovms", "all"], 
-                        required=True, help="Specificați ce țintă doriți să executați.")
-    
-    args = parser.parse_args()
-    
-    # PATH adjustment
-    os.environ["PATH"] += os.pathsep + os.path.expanduser("~/.local/bin")
-    
-    targets = []
-    if args.target == "all":
-        targets = ["unikraft-native", "unikraft-bincompat", "nanovms"]
-    else:
-        targets = [args.target]
-
-    all_results = []
-
-    for target in targets:
-        # Pre-cleanup
-        teardown.teardown_qemu()
-
-        metrics = None
-        if target == "unikraft-native":
-            metrics = run_unikraft_native()
-        elif target == "unikraft-bincompat":
-            metrics = run_unikraft_bincompat()
-        elif target == "nanovms":
-            metrics = run_nanovms()
-
-        if metrics:
-            all_results.append(metrics)
-
-        print(f"\n--- Faza 2 finalizată pentru {target} ---")
-        
-        # Cleanup între runde dacă sunt lansate multiple
-        if args.target == "all":
-            print(f">> Curățare forțată instanță {target} înainte de următorul benchmark...")
-            teardown.teardown_qemu()
-            time.sleep(2)
-
-    if all_results:
-        with open("benchmark_results.json", "w") as f:
-            json.dump(all_results, f, indent = 4)
-        print("\n[SUCCES] Datele au fost salvate în 'benchmark_results.json'.")
-    
-    # Dacă rulăm o singură instanță, păstrăm scriptul deschis ca utilizatorul să o poată folosi
-    if args.target != "all":
-        print("\n========================================================")
-        print("✅ Instanța rulează cu succes în fundal (Daemon).")
-        print("🌐 Poți testa în alt terminal: curl http://localhost:8080")
-        print("========================================================")
-        print("Pentru a închide procesul, apasă CTRL+C sau tasta ENTER aici.")
-        print("Dacă închizi acest terminal accidental, scrie în altul:")
-        print("  kraft rm nginx-native (sau nginx-bincompat)")
-        print("========================================================\n")
-        try:
-            input("Apasă [ENTER] pentru a opri instanța și a ieși curat...\n")
-        except KeyboardInterrupt:
-            pass
-        print("Se execută oprirea...")
-
-if __name__ == "__main__":
-    main()
 
