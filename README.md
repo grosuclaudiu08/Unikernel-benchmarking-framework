@@ -25,9 +25,7 @@ Mai jos este prezentată o analiză detaliată a ceea ce s-a implementat pe fiec
 
 ## Ce mai trebuie adăugat / Implementat (Pașii Următori - Faza 4)
 
-Framework-ul este stabil și extrage automat toate metricile. Singurul efort rămas constă în vizualizarea acestora:
-
-1. **Generarea Graficelor (Faza 4):** Crearea unui script separat (de ex. folosind `matplotlib` sau `pandas` în Python) care va parsa fișierul `benchmark_results.json` rezultat din Orchestrator și va genera grafice comparative (bar charts) între:
-   * **Boot Time:** Nativ vs Bincompat vs NanoVMs.
-   * **Resource Usage:** Idle RAM vs Peak RAM și Image Size.
-   * **Network Performance:** Requests Per Second (RPS) și Latency.
+Framework-ul este **COMPLET**.
+1. **Generarea Graficelor (Faza 4):** ✅ **Finalizat**. A fost creat scriptul `plot_metrics.py` care citește datele din `benchmark_results.json` și generează diagrame vizuale (bar charts) cu Matplotlib. Graficele comparative pentru Boot Time, RAM Usage, Image Size, RPS și Latență sunt salvate automat în folderul `graphs/`.
+   - Pentru a rula graficele, trebuie instalate dependențele: `pip install -r requirements.txt`
+   - Apoi se execută: `python3 plot_metrics.py`
